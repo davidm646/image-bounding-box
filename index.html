@@ -81,11 +81,10 @@
             border-color: var(--primary);
         }
         #canvas-container.image-loaded {
-            border-style: solid; /* Change border to solid when image is loaded */
-            min-height: initial; /* Remove min-height once image is loaded */
+            border-style: solid;
+            min-height: initial;
             min-width: initial;
         }
-        /* Make container clickable only when no image is loaded */
         #canvas-container:not(.image-loaded) {
             cursor: pointer;
         }
@@ -102,7 +101,6 @@
             cursor: crosshair;
         }
         
-        /* NEW: Placeholder styling */
         #placeholder {
             display: flex;
             flex-direction: column;
@@ -110,6 +108,7 @@
             justify-content: center;
             color: var(--on-surface-secondary);
             text-align: center;
+            padding: 2rem;
         }
         #placeholder svg {
             width: 50px;
@@ -133,6 +132,7 @@
         .controls {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 1rem;
         }
         .file-input-label {
@@ -153,6 +153,24 @@
         }
         #fileName {
             color: var(--on-surface-secondary);
+        }
+
+        /* NEW: Styles for the clear button and a general hidden class */
+        .hidden {
+            display: none;
+        }
+        #clearImageBtn {
+            background-color: #4a4a4a;
+            color: var(--on-surface);
+            padding: 10px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+        #clearImageBtn:hover {
+            background-color: #5a5a5a;
         }
         
         .info-panel {
@@ -250,13 +268,14 @@
             <label for="imageLoader" class="file-input-label">Upload Image</label>
             <input type="file" id="imageLoader" name="imageLoader" accept="image/*"/>
             <span id="fileName">No file chosen</span>
+            <!-- NEW: Clear Image button, initially hidden -->
+            <button id="clearImageBtn" class="hidden">Clear Image</button>
         </div>
         
         <div class="workspace">
             <div id="canvas-container">
                 <canvas id="canvas"></canvas>
                 <div id="spinner"></div>
-                <!-- NEW: Placeholder element -->
                 <div id="placeholder">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
                     <p>Click to upload or drag and drop</p>
@@ -290,6 +309,7 @@
         const cursorCoordsEl = document.getElementById('cursorCoords');
         const fileNameEl = document.getElementById('fileName');
         const canvasContainer = document.getElementById('canvas-container');
+        const clearImageBtn = document.getElementById('clearImageBtn'); // NEW: Get the button
 
         let isDrawing = false, wasDrawing = false;
         let startX, startY;
@@ -298,10 +318,7 @@
         let loadedImage = null;
 
         function handleFile(file) {
-            if (!file || !file.type.startsWith('image/')) {
-                console.warn("Attempted to load a non-image file.");
-                return;
-            }
+            if (!file || !file.type.startsWith('image/')) { return; }
             
             fileNameEl.textContent = file.name;
             canvasContainer.classList.add('loading');
@@ -317,17 +334,34 @@
                     loadedImage = img;
                     canvasContainer.classList.add('image-loaded');
                     resizeCanvas();
-
                     canvasContainer.classList.remove('loading');
+                    clearImageBtn.classList.remove('hidden'); // NEW: Show the clear button
                 }
                 img.src = event.target.result;
             }
             reader.readAsDataURL(file);
         }
+        
+        // NEW: Function to reset the entire app state
+        function resetApp() {
+            loadedImage = null;
+            originalWidth = 0;
+            originalHeight = 0;
+            
+            canvasContainer.classList.remove('image-loaded', 'loading');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            resetInfo();
+            sourceSizeEl.textContent = 'N/A';
+            cursorCoordsEl.textContent = 'N/A';
+            fileNameEl.textContent = 'No file chosen';
+            
+            clearImageBtn.classList.add('hidden');
+            imageLoader.value = '';
+        }
 
         function resizeCanvas() {
             if (!loadedImage) return;
-
             const workspace = document.querySelector('.workspace');
             const infoPanel = document.querySelector('.info-panel');
             
@@ -341,69 +375,48 @@
             }
             
             const availableHeight = window.innerHeight * 0.75;
-
-            scaleFactor = Math.min(
-                availableWidth / originalWidth, 
-                availableHeight / originalHeight,
-                1
-            );
+            scaleFactor = Math.min(availableWidth / originalWidth, availableHeight / originalHeight, 1);
             
             canvas.width = originalWidth * scaleFactor;
             canvas.height = originalHeight * scaleFactor;
-            
             clearBoundingBox();
         }
 
         imageLoader.addEventListener('change', e => {
-            if (e.target.files && e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            if (e.target.files && e.target.files.length > 0) handleFile(e.target.files[0]);
         });
         
         window.addEventListener('resize', resizeCanvas);
         
-        // --- Event Listeners for Upload Container ---
         canvasContainer.addEventListener('click', () => {
-            if (!loadedImage) {
-                imageLoader.click();
-            }
+            if (!loadedImage) imageLoader.click();
         });
+
+        clearImageBtn.addEventListener('click', resetApp); // NEW: Event listener for the clear button
 
         const dropZone = canvasContainer;
         let dragCounter = 0;
 
         dropZone.addEventListener('dragenter', e => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             dragCounter++;
-            dropZone.classList.add('drag-active');
+            if (!loadedImage) dropZone.classList.add('drag-active');
         });
 
-        dropZone.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
 
         dropZone.addEventListener('dragleave', e => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             dragCounter--;
-            if (dragCounter === 0) {
-                dropZone.classList.remove('drag-active');
-            }
+            if (dragCounter === 0) dropZone.classList.remove('drag-active');
         });
 
         dropZone.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             dragCounter = 0;
             dropZone.classList.remove('drag-active');
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                handleFile(e.dataTransfer.files[0]);
-            }
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
-
-        // --- Drawing and Info logic is unchanged ---
         
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
@@ -470,8 +483,7 @@
         
         canvas.addEventListener('mousemove', e => {
             if (!loadedImage || !scaleFactor) {
-                cursorCoordsEl.textContent = 'N/A';
-                return;
+                cursorCoordsEl.textContent = 'N/A'; return;
             }
             const pos = getEventPos(canvas, e);
             const originalX = Math.round(pos.x / scaleFactor);
@@ -507,8 +519,7 @@
             const boxArea = (originalX2 - originalX1) * (originalY2 - originalY1);
             const imageArea = originalWidth * originalHeight;
             if (imageArea > 0) {
-                const percentage = ((boxArea / imageArea) * 100).toFixed(2);
-                percentageEl.textContent = `${percentage}%`;
+                percentageEl.textContent = `${((boxArea / imageArea) * 100).toFixed(2)}%`;
             } else {
                 percentageEl.textContent = '0%';
             }
