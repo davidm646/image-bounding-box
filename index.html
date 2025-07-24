@@ -69,27 +69,67 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 200px;
+            min-height: 300px;
+            min-width: 400px;
             flex-shrink: 1;
             flex-grow: 1;
             overflow: hidden;
-            border: 1px solid var(--border-color);
+            border: 2px dashed var(--border-color);
             transition: background-color 0.2s ease, border-color 0.2s ease;
         }
-        /* NEW: Styling for the active drag-and-drop target */
         #canvas-container.drag-active {
-            background-color: var(--surface-active);
-            border: 2px dashed var(--primary);
+            border-color: var(--primary);
         }
+        #canvas-container.image-loaded {
+            border-style: solid; /* Change border to solid when image is loaded */
+            min-height: initial; /* Remove min-height once image is loaded */
+            min-width: initial;
+        }
+        /* Make container clickable only when no image is loaded */
+        #canvas-container:not(.image-loaded) {
+            cursor: pointer;
+        }
+
         canvas {
-            display: none; /* Hide until an image is loaded */
+            display: none;
             max-width: 100%;
             max-height: 100%;
             height: auto;
             width: auto;
+        }
+        #canvas-container.image-loaded canvas {
+            display: block;
             cursor: crosshair;
         }
         
+        /* NEW: Placeholder styling */
+        #placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--on-surface-secondary);
+            text-align: center;
+        }
+        #placeholder svg {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 1rem;
+            fill: var(--on-surface-secondary);
+        }
+        #placeholder p {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--on-surface);
+            margin: 0 0 0.5rem 0;
+        }
+        #placeholder small {
+            font-size: 0.9rem;
+        }
+        #canvas-container.image-loaded #placeholder {
+            display: none;
+        }
+
         .controls {
             display: flex;
             align-items: center;
@@ -165,6 +205,13 @@
             animation: spin 1s linear infinite;
             position: absolute;
         }
+        #canvas-container.loading #spinner {
+            display: block;
+        }
+        #canvas-container.loading #placeholder {
+            display: none;
+        }
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -209,6 +256,12 @@
             <div id="canvas-container">
                 <canvas id="canvas"></canvas>
                 <div id="spinner"></div>
+                <!-- NEW: Placeholder element -->
+                <div id="placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                    <p>Click to upload or drag and drop</p>
+                    <small>JPG, PNG, GIF, or WEBP</small>
+                </div>
             </div>
             
             <div class="info-panel">
@@ -236,7 +289,6 @@
         const percentageEl = document.getElementById('percentage');
         const cursorCoordsEl = document.getElementById('cursorCoords');
         const fileNameEl = document.getElementById('fileName');
-        const spinnerEl = document.getElementById('spinner');
         const canvasContainer = document.getElementById('canvas-container');
 
         let isDrawing = false, wasDrawing = false;
@@ -252,8 +304,7 @@
             }
             
             fileNameEl.textContent = file.name;
-            spinnerEl.style.display = 'block';
-            canvas.style.display = 'none';
+            canvasContainer.classList.add('loading');
             
             const reader = new FileReader();
             reader.onload = event => {
@@ -264,10 +315,10 @@
                     sourceSizeEl.textContent = `${originalWidth} x ${originalHeight}`;
                     
                     loadedImage = img;
+                    canvasContainer.classList.add('image-loaded');
                     resizeCanvas();
 
-                    spinnerEl.style.display = 'none';
-                    canvas.style.display = 'block';
+                    canvasContainer.classList.remove('loading');
                 }
                 img.src = event.target.result;
             }
@@ -280,9 +331,8 @@
             const workspace = document.querySelector('.workspace');
             const infoPanel = document.querySelector('.info-panel');
             
-            // --- FIX: More robust scaling logic ---
             let availableWidth;
-            const gap = 32; // Corresponds to 2rem gap in CSS
+            const gap = 32;
             
             if (window.getComputedStyle(workspace).flexDirection === 'row') {
                 availableWidth = workspace.clientWidth - infoPanel.offsetWidth - gap;
@@ -312,7 +362,13 @@
         
         window.addEventListener('resize', resizeCanvas);
         
-        // --- UPDATED: Drag and drop now targets the canvas container ---
+        // --- Event Listeners for Upload Container ---
+        canvasContainer.addEventListener('click', () => {
+            if (!loadedImage) {
+                imageLoader.click();
+            }
+        });
+
         const dropZone = canvasContainer;
         let dragCounter = 0;
 
@@ -347,6 +403,8 @@
             }
         });
 
+        // --- Drawing and Info logic is unchanged ---
+        
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
