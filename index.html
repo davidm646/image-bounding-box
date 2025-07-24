@@ -56,26 +56,25 @@
             gap: 2rem;
             width: 100%;
             align-items: flex-start;
+            justify-content: center; /* Center the items horizontally */
         }
 
         #canvas-container {
             position: relative;
             border: 1px dashed var(--border-color);
-            /* border-radius: 8px; */ /* REMOVED */
             background-color: var(--surface);
             box-shadow: 0 4px 15px var(--shadow-color);
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 300px;
-            flex-grow: 1;
+            /* flex-grow: 1; */ /* REMOVED: This was causing the container to stretch */
         }
         canvas {
             display: block;
             max-width: 100%;
             height: auto;
             cursor: crosshair;
-            /* border-radius: 8px; */ /* REMOVED */
         }
         
         .controls {
@@ -106,7 +105,7 @@
         #info {
             background-color: var(--surface);
             padding: 20px;
-            border-radius: 8px; /* Kept rounded corners here */
+            border-radius: 8px;
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px var(--shadow-color);
             flex-basis: 320px;
@@ -142,6 +141,7 @@
         @media (max-width: 900px) {
             .workspace {
                 flex-direction: column;
+                align-items: center; /* Center items when stacked */
             }
             #info {
                 width: 100%;
@@ -219,8 +219,13 @@
                     sourceSizeEl.textContent = `${originalWidth} x ${originalHeight}`;
                     
                     const canvasContainer = document.getElementById('canvas-container');
-                    const maxWidth = canvasContainer.clientWidth;
+                    const workspace = document.querySelector('.workspace');
+                    const info = document.getElementById('info');
+                    
+                    // Max width for canvas is workspace width minus info box width and gap
+                    const maxWidth = workspace.clientWidth - info.offsetWidth - 32; // 32 is for the 2rem gap
                     const maxHeight = window.innerHeight * 0.6;
+                    
                     scaleFactor = Math.min(maxWidth / originalWidth, maxHeight / originalHeight, 1);
 
                     canvas.width = originalWidth * scaleFactor;
