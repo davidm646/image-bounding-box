@@ -32,6 +32,33 @@
             box-sizing: border-box;
         }
 
+        /* NEW: Drag-over overlay effect */
+        body::after {
+            content: 'Drop Image Anywhere';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.75);
+            border: 4px dashed var(--primary);
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            font-weight: 500;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+        body.drag-over::after {
+            opacity: 1;
+        }
+
+
         .main-container {
             width: 100%;
             max-width: 90vw;
@@ -237,37 +264,14 @@
         let scaleFactor = 1;
         let loadedImage = null;
 
-        function resizeCanvas() {
-            if (!loadedImage) return;
-
-            const workspace = document.querySelector('.workspace');
-            const canvasContainer = document.getElementById('canvas-container');
-            
-            let availableWidth;
-            if (window.getComputedStyle(workspace).flexDirection === 'row') {
-                availableWidth = canvasContainer.clientWidth;
-            } else {
-                availableWidth = workspace.clientWidth;
+        // --- NEW: Centralized function to handle file processing ---
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                console.warn("Attempted to load a non-image file.");
+                return;
             }
             
-            const availableHeight = window.innerHeight * 0.7;
-
-            scaleFactor = Math.min(
-                availableWidth / originalWidth, 
-                availableHeight / originalHeight,
-                1 // Never scale up beyond 100%
-            );
-            
-            canvas.width = originalWidth * scaleFactor;
-            canvas.height = originalHeight * scaleFactor;
-            
-            clearBoundingBox();
-        }
-
-        imageLoader.addEventListener('change', e => {
-            if (!e.target.files[0]) return;
-            
-            fileNameEl.textContent = e.target.files[0].name;
+            fileNameEl.textContent = file.name;
             spinnerEl.style.display = 'block';
             canvas.style.display = 'none';
             
@@ -287,10 +291,83 @@
                 }
                 img.src = event.target.result;
             }
-            reader.readAsDataURL(e.target.files[0]);
+            reader.readAsDataURL(file);
+        }
+
+
+        function resizeCanvas() {
+            if (!loadedImage) return;
+
+            const workspace = document.querySelector('.workspace');
+            const canvasContainer = document.getElementById('canvas-container');
+            
+            let availableWidth;
+            if (window.getComputedStyle(workspace).flexDirection === 'row') {
+                availableWidth = canvasContainer.clientWidth;
+            } else {
+                availableWidth = workspace.clientWidth;
+            }
+            
+            const availableHeight = window.innerHeight * 0.7;
+
+            scaleFactor = Math.min(
+                availableWidth / originalWidth, 
+                availableHeight / originalHeight,
+                1
+            );
+            
+            canvas.width = originalWidth * scaleFactor;
+            canvas.height = originalHeight * scaleFactor;
+            
+            clearBoundingBox();
+        }
+
+        // --- UPDATED: Listener for file input now uses the handler ---
+        imageLoader.addEventListener('change', e => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
         });
         
         window.addEventListener('resize', resizeCanvas);
+        
+        // --- NEW: Drag and drop event listeners ---
+        const dropZone = document.body;
+        let dragCounter = 0; // Counter to prevent flickering on child elements
+
+        dropZone.addEventListener('dragenter', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter++;
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        dropZone.addEventListener('dragleave', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dropZone.classList.remove('drag-over');
+            }
+        });
+
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter = 0;
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+
+        // --- Drawing and Info logic is unchanged ---
         
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
