@@ -11,6 +11,7 @@
         :root {
             --background: #1a1a1a;
             --surface: #2c2c2c;
+            --surface-active: #3a3a3a;
             --primary: #4f86f7;
             --on-surface: #e0e0e0;
             --on-surface-secondary: #a0a0a0;
@@ -31,34 +32,7 @@
             min-height: 100vh;
             box-sizing: border-box;
         }
-
-        /* NEW: Drag-over overlay effect */
-        body::after {
-            content: 'Drop Image Anywhere';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.75);
-            border: 4px dashed var(--primary);
-            box-sizing: border-box;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 2rem;
-            font-weight: 500;
-            z-index: 9999;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-        }
-        body.drag-over::after {
-            opacity: 1;
-        }
-
-
+        
         .main-container {
             width: 100%;
             max-width: 90vw;
@@ -100,9 +74,15 @@
             flex-grow: 1;
             overflow: hidden;
             border: 1px solid var(--border-color);
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        /* NEW: Styling for the active drag-and-drop target */
+        #canvas-container.drag-active {
+            background-color: var(--surface-active);
+            border: 2px dashed var(--primary);
         }
         canvas {
-            display: block;
+            display: none; /* Hide until an image is loaded */
             max-width: 100%;
             max-height: 100%;
             height: auto;
@@ -257,6 +237,7 @@
         const cursorCoordsEl = document.getElementById('cursorCoords');
         const fileNameEl = document.getElementById('fileName');
         const spinnerEl = document.getElementById('spinner');
+        const canvasContainer = document.getElementById('canvas-container');
 
         let isDrawing = false, wasDrawing = false;
         let startX, startY;
@@ -264,7 +245,6 @@
         let scaleFactor = 1;
         let loadedImage = null;
 
-        // --- NEW: Centralized function to handle file processing ---
         function handleFile(file) {
             if (!file || !file.type.startsWith('image/')) {
                 console.warn("Attempted to load a non-image file.");
@@ -294,21 +274,23 @@
             reader.readAsDataURL(file);
         }
 
-
         function resizeCanvas() {
             if (!loadedImage) return;
 
             const workspace = document.querySelector('.workspace');
-            const canvasContainer = document.getElementById('canvas-container');
+            const infoPanel = document.querySelector('.info-panel');
             
+            // --- FIX: More robust scaling logic ---
             let availableWidth;
+            const gap = 32; // Corresponds to 2rem gap in CSS
+            
             if (window.getComputedStyle(workspace).flexDirection === 'row') {
-                availableWidth = canvasContainer.clientWidth;
+                availableWidth = workspace.clientWidth - infoPanel.offsetWidth - gap;
             } else {
                 availableWidth = workspace.clientWidth;
             }
             
-            const availableHeight = window.innerHeight * 0.7;
+            const availableHeight = window.innerHeight * 0.75;
 
             scaleFactor = Math.min(
                 availableWidth / originalWidth, 
@@ -322,7 +304,6 @@
             clearBoundingBox();
         }
 
-        // --- UPDATED: Listener for file input now uses the handler ---
         imageLoader.addEventListener('change', e => {
             if (e.target.files && e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
@@ -331,15 +312,15 @@
         
         window.addEventListener('resize', resizeCanvas);
         
-        // --- NEW: Drag and drop event listeners ---
-        const dropZone = document.body;
-        let dragCounter = 0; // Counter to prevent flickering on child elements
+        // --- UPDATED: Drag and drop now targets the canvas container ---
+        const dropZone = canvasContainer;
+        let dragCounter = 0;
 
         dropZone.addEventListener('dragenter', e => {
             e.preventDefault();
             e.stopPropagation();
             dragCounter++;
-            dropZone.classList.add('drag-over');
+            dropZone.classList.add('drag-active');
         });
 
         dropZone.addEventListener('dragover', e => {
@@ -352,7 +333,7 @@
             e.stopPropagation();
             dragCounter--;
             if (dragCounter === 0) {
-                dropZone.classList.remove('drag-over');
+                dropZone.classList.remove('drag-active');
             }
         });
 
@@ -360,15 +341,12 @@
             e.preventDefault();
             e.stopPropagation();
             dragCounter = 0;
-            dropZone.classList.remove('drag-over');
+            dropZone.classList.remove('drag-active');
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                 handleFile(e.dataTransfer.files[0]);
             }
         });
 
-
-        // --- Drawing and Info logic is unchanged ---
-        
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
