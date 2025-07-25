@@ -133,6 +133,7 @@
             display: flex;
             align-items: center;
             flex-wrap: wrap;
+            justify-content: center;
             gap: 1rem;
         }
         .file-input-label {
@@ -155,7 +156,6 @@
             color: var(--on-surface-secondary);
         }
 
-        /* NEW: Styles for the clear button and a general hidden class */
         .hidden {
             display: none;
         }
@@ -268,7 +268,6 @@
             <label for="imageLoader" class="file-input-label">Upload Image</label>
             <input type="file" id="imageLoader" name="imageLoader" accept="image/*"/>
             <span id="fileName">No file chosen</span>
-            <!-- NEW: Clear Image button, initially hidden -->
             <button id="clearImageBtn" class="hidden">Clear Image</button>
         </div>
         
@@ -309,7 +308,7 @@
         const cursorCoordsEl = document.getElementById('cursorCoords');
         const fileNameEl = document.getElementById('fileName');
         const canvasContainer = document.getElementById('canvas-container');
-        const clearImageBtn = document.getElementById('clearImageBtn'); // NEW: Get the button
+        const clearImageBtn = document.getElementById('clearImageBtn');
 
         let isDrawing = false, wasDrawing = false;
         let startX, startY;
@@ -335,18 +334,16 @@
                     canvasContainer.classList.add('image-loaded');
                     resizeCanvas();
                     canvasContainer.classList.remove('loading');
-                    clearImageBtn.classList.remove('hidden'); // NEW: Show the clear button
+                    clearImageBtn.classList.remove('hidden');
                 }
                 img.src = event.target.result;
             }
             reader.readAsDataURL(file);
         }
         
-        // NEW: Function to reset the entire app state
         function resetApp() {
             loadedImage = null;
-            originalWidth = 0;
-            originalHeight = 0;
+            originalWidth = 0; originalHeight = 0;
             
             canvasContainer.classList.remove('image-loaded', 'loading');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -392,7 +389,7 @@
             if (!loadedImage) imageLoader.click();
         });
 
-        clearImageBtn.addEventListener('click', resetApp); // NEW: Event listener for the clear button
+        clearImageBtn.addEventListener('click', resetApp);
 
         const dropZone = canvasContainer;
         let dragCounter = 0;
@@ -451,11 +448,17 @@
             e.preventDefault();
             wasDrawing = true;
             const pos = getEventPos(canvas, e);
+            const currentX = pos.x;
+            const currentY = pos.y;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (loadedImage) ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
             ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
             ctx.lineWidth = 2;
-            ctx.strokeRect(startX, startY, pos.x - startX, pos.y - startY);
+            ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+            
+            // NEW: Update info panel in real-time during the draw
+            updateInfo(startX, startY, currentX, currentY);
         }
 
         function stopDrawing(e) {
